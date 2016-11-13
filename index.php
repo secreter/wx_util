@@ -1,4 +1,20 @@
 <?php
+/*
+*
+*实现类的自动加载
+*/
+define("ROOT",dirname(__FILE__));
+set_include_path(".".PATH_SEPARATOR.ROOT."/public".PATH_SEPARATOR.get_include_path());
+//__autoload();在实例化的对象没有找到类时会触发；实现动态加载
+function __autoload($classname)
+{
+    if(file_exists("$classname.php")){
+      require_once("$classname.php");
+    }
+    else{
+      echo 'class file'.$classname.'not found!';
+    }
+}
 
 //include "mysql.php";
 
@@ -95,10 +111,10 @@ class Wechat_base_api{
         }
 
         //2、解析XML数据包
-        $object = $this->xmlObject= simplexml_load_string($postData,"SimpleXMLElement",LIBXML_NOCDATA);
+        $xmlObject = $this->xmlObject = simplexml_load_string($postData,"SimpleXMLElement",LIBXML_NOCDATA);
 
         //获取消息类型
-        $MsgType = $object->MsgType;
+        $MsgType = $xmlObject->MsgType;
 
         switch ($MsgType) {
 
@@ -106,14 +122,14 @@ class Wechat_base_api{
 
                     //接收事件推送
 
-                    $this->receiveEvent($object);   
+                    $this->receiveEvent($xmlObject);   
 
                 break;  
 
             case 'text':
 
                     //接收文本消息
-            if($object->Content=='debug'){
+            if($xmlObject->Content=='debug'){
                 $postData=str_replace('<', '《', $postData);
                 $postData=str_replace('>', '》', $postData);
                 foreach ($_GET as $key => $value) {
@@ -130,7 +146,7 @@ class Wechat_base_api{
             }
 
 
-            if($object->Content=='菜单'){
+            if($xmlObject->Content=='菜单'){
 
                 $content='*回复“菜单”，显示本操作菜单。
 
@@ -174,9 +190,7 @@ class Wechat_base_api{
 
                          }   
 
-
-
-                    echo $this->replyText($content); 
+                    echo $this->replyText($xmlObject->Content); 
 
                         break;
                     
@@ -185,7 +199,7 @@ class Wechat_base_api{
 
                         //接收图片消息
 
-                        echo $this->receiveImage($object);  
+                        echo $this->receiveImage($xmlObject);  
 
                 break;
 
@@ -193,7 +207,7 @@ class Wechat_base_api{
 
                         //接收地理位置消息
 
-                        echo $this->receiveLocation($object);   
+                        echo $this->receiveLocation($xmlObject);   
 
                 break;  
 
@@ -201,7 +215,7 @@ class Wechat_base_api{
 
                     //接收语音消息
 
-                    echo $this->receiveVoice($object);
+                    echo $this->receiveVoice($xmlObject);
 
                 break; 
 
@@ -209,7 +223,7 @@ class Wechat_base_api{
 
                     //接收视频消息
 
-                    echo $this->receiveVideo($object);
+                    echo $this->receiveVideo($xmlObject);
 
                 break;
 
@@ -217,7 +231,7 @@ class Wechat_base_api{
 
                     //接小收视频消息
 
-                    echo $this->receiveVideo($object);
+                    echo $this->receiveVideo($xmlObject);
 
                 break;
 
@@ -225,7 +239,7 @@ class Wechat_base_api{
 
                     //接收链接消息
 
-                    echo $this->receiveLink($object);
+                    echo $this->receiveLink($xmlObject);
 
                     break;
 
