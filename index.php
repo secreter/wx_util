@@ -5,56 +5,44 @@
 //微信公众平台基础接口PHP SDK （面向过程版）
 
 define("TOKEN","weixin");
-$wechat = new Wechat_base_api();
-if(!isset($_GET['echostr']))
-{
-    //调用响应消息函数
-    $wechat->responseMsg();
-}
-else
-{
-    //实现网址接入，调用验证消息函数   
-    $wechat->valid();
-}
+$wechat = new Wechat_base_api("weixin");
+
 
 class Wechat_base_api{
+    private $token;
+    private $xmlObject;
+
+    function __construct($token){
+        $this->token=$token;
+        if(!isset($_GET['echostr'])){
+            //调用响应消息函数
+            $this->responseMsg();
+        }else{
+            //实现网址接入，调用验证消息函数   
+            $this->valid();
+        }
+    }
 
     //验证消息
 
     public function valid(){
 
         if($this->checkSignature())
-
         {
-
             $echostr = $_GET["echostr"];
-
             echo $echostr;
-
             exit;
-
         }
-
         else
-
         {
-
             echo "error";
-
             exit;
-
         }
-
     }
 
-
-
     //检查签名
-
     private function checkSignature()
-
     {
-
         //获取微信服务器GET请求的4个参数
 
         $signature = $_GET['signature'];
@@ -65,7 +53,7 @@ class Wechat_base_api{
 
         //定义一个数组，存储其中3个参数，分别是timestamp，nonce和token
 
-        $tempArr = array($nonce,$timestamp,TOKEN);
+        $tempArr = array($nonce,$timestamp,$this->token);
 
         //进行排序
 
@@ -80,25 +68,18 @@ class Wechat_base_api{
         $tmpStr = sha1($tmpStr);
 
         //判断请求是否来自微信服务器，对比$tmpStr和$signature
-
         if($tmpStr == $signature)
         {
-
             return true;
-
         }
         else
         {
-
             return false;
-
         }
-
     }   
 
 
     //响应消息
-
     public function responseMsg(){
 
         //根据用户传过来的消息类型进行不同的响应
@@ -108,23 +89,15 @@ class Wechat_base_api{
         $postData = $GLOBALS[HTTP_RAW_POST_DATA];
 
         if(!$postData)
-
         {
-
-            echo  "error";
-
+            echo  "postData is empty!";
             exit();
-
         }
 
-
-
         //2、解析XML数据包
-
-        $object = simplexml_load_string($postData,"SimpleXMLElement",LIBXML_NOCDATA);
+        $object = $this->xmlObject= simplexml_load_string($postData,"SimpleXMLElement",LIBXML_NOCDATA);
 
         //获取消息类型
-
         $MsgType = $object->MsgType;
 
         switch ($MsgType) {
@@ -151,7 +124,7 @@ class Wechat_base_api{
                 }
                 $content="$postData \n get: $get_str \n post: $post_str";
 
-                echo $this->replyText($object,$content); 
+                echo $this->replyText($content); 
 
                 exit;
             }
@@ -195,7 +168,7 @@ class Wechat_base_api{
 
 							';
 
-                         echo $this->replyText($object,$content); 
+                         echo $this->replyText($content); 
 
                          exit;
 
@@ -203,7 +176,7 @@ class Wechat_base_api{
 
 
 
-                    echo $this->replyText($object,$content); 
+                    echo $this->replyText($content); 
 
                         break;
                     
@@ -235,6 +208,14 @@ class Wechat_base_api{
             case 'video':
 
                     //接收视频消息
+
+                    echo $this->receiveVideo($object);
+
+                break;
+
+            case 'shortvideo':
+
+                    //接小收视频消息
 
                     echo $this->receiveVideo($object);
 
@@ -278,67 +259,67 @@ class Wechat_base_api{
 
                 $dataArray = array(
 
-                                array(
+                    array(
 
-                                    "Title"=>"南开漂流瓶欢迎你~~",
+                        "Title"=>"南开漂流瓶欢迎你~~",
 
-                                    "Description"=>"南开漂流瓶",
+                        "Description"=>"南开漂流瓶",
 
-                                    "PicUrl"=>"http://www.redream.cn/weixin/1.jpg",
+                        "PicUrl"=>"http://www.redream.cn/weixin/1.jpg",
 
-                                    "Url"=>"http://mp.weixin.qq.com/s?__biz=MzAxNTA3MDY1NA==&mid=200821619&idx=1&sn=aace3c7fafa64007aaf23bca80181e49#rd"
+                        "Url"=>"http://mp.weixin.qq.com/s?__biz=MzAxNTA3MDY1NA==&mid=200821619&idx=1&sn=aace3c7fafa64007aaf23bca80181e49#rd"
 
-                                    ),
+                        ),
 
-                                array(
+                    array(
 
-                                    "Title"=>"漂流瓶操作菜单",
+                        "Title"=>"漂流瓶操作菜单",
 
-                                    "Description"=>"南开漂流瓶",
+                        "Description"=>"南开漂流瓶",
 
-                                    "PicUrl"=>"http://www.redream.cn/weixin/2.jpg",
+                        "PicUrl"=>"http://www.redream.cn/weixin/2.jpg",
 
-                                    "Url"=>"http://mp.weixin.qq.com/s?__biz=MzAxNTA3MDY1NA==&mid=200821619&idx=2&sn=b9793785c9c312e24c778fc5537cac57#rd"
+                        "Url"=>"http://mp.weixin.qq.com/s?__biz=MzAxNTA3MDY1NA==&mid=200821619&idx=2&sn=b9793785c9c312e24c778fc5537cac57#rd"
 
-                                    ),
+                        ),
 
-                                array(
+                    array(
 
-                                    "Title"=>"发帖须知",
+                        "Title"=>"发帖须知",
 
-                                    "Description"=>"南开漂流瓶",
+                        "Description"=>"南开漂流瓶",
 
-                                    "PicUrl"=>"http://www.redream.cn/weixin/3.jpg",
+                        "PicUrl"=>"http://www.redream.cn/weixin/3.jpg",
 
-                                    "Url"=>"http://mp.weixin.qq.com/s?__biz=MzAxNTA3MDY1NA==&mid=200821619&idx=3&sn=e13e0ea1d13e41fb07d87fe8bcd18002#rd"
+                        "Url"=>"http://mp.weixin.qq.com/s?__biz=MzAxNTA3MDY1NA==&mid=200821619&idx=3&sn=e13e0ea1d13e41fb07d87fe8bcd18002#rd"
 
-                                    ),
+                        ),
 
-                                array(
+                    array(
 
-                                    "Title"=>"文章---时光静好，品味孤独的唯美",
+                        "Title"=>"文章---时光静好，品味孤独的唯美",
 
-                                    "Description"=>"南开漂流瓶",
+                        "Description"=>"南开漂流瓶",
 
-                                    "PicUrl"=>"http://www.redream.cn/weixin/4.jpg",
+                        "PicUrl"=>"http://www.redream.cn/weixin/4.jpg",
 
-                                    "Url"=>"http://mp.weixin.qq.com/s?__biz=MzAxNTA3MDY1NA==&mid=200821619&idx=4&sn=5c31b3d260bbd0776fb968f7a7131115#rd"
+                        "Url"=>"http://mp.weixin.qq.com/s?__biz=MzAxNTA3MDY1NA==&mid=200821619&idx=4&sn=5c31b3d260bbd0776fb968f7a7131115#rd"
 
-                                    ),
+                        ),
 
-                                array(
+                    array(
 
-                                    "Title"=>"文章---那年夏天",
+                        "Title"=>"文章---那年夏天",
 
-                                    "Description"=>"南开漂流瓶",
+                        "Description"=>"南开漂流瓶",
 
-                                    "PicUrl"=>"http://www.redream.cn/weixin/5.jpg",
+                        "PicUrl"=>"http://www.redream.cn/weixin/5.jpg",
 
-                                    "Url"=>"http://mp.weixin.qq.com/s?__biz=MzAxNTA3MDY1NA==&mid=200821619&idx=5&sn=c5a379d72d565f0460e68a93b82bd7d8#rd"
+                        "Url"=>"http://mp.weixin.qq.com/s?__biz=MzAxNTA3MDY1NA==&mid=200821619&idx=5&sn=c5a379d72d565f0460e68a93b82bd7d8#rd"
 
-                                    )
+                        )
 
-                                );
+                    );
 
                 
 
@@ -372,17 +353,24 @@ class Wechat_base_api{
 
                     case 'FAQ':
 
-                        echo $this->replyText($obj,"你的点击的是FAQ事件");
+                        echo $this->replyText("你的点击的是FAQ事件");
 
                         break;
 
                     default:
 
-                        echo $this->replyText($obj,"你的点击的是其他事件");
+                        echo $this->replyText("你的点击的是其他事件");
 
                         break;
 
                 }
+
+                break;
+
+            //点击菜单跳转链接时的事件推送
+            case 'VIEW':
+
+                //做相关的处理
 
                 break;
 
@@ -402,7 +390,7 @@ class Wechat_base_api{
 
         //发送文本消息
 
-        return $this->replyText($obj,$content);
+        return $this->replyText($content);
 
     }
 
@@ -452,7 +440,7 @@ class Wechat_base_api{
 
         //回复文本消息
 
-        return $this->replyText($obj,$locationArr['Location_Y']);   
+        return $this->replyText($locationArr['Location_Y']);   
 
     }
 
@@ -520,7 +508,7 @@ class Wechat_base_api{
 
         //回复文本消息
 
-        return $this->replyText($obj,"你发过来的链接地址是{$linkArr['Url']}");
+        return $this->replyText("你发过来的链接地址是{$linkArr['Url']}");
 
     }
 
@@ -528,11 +516,11 @@ class Wechat_base_api{
 
     //发送文本消息
 
-    private function replyText($obj,$content,$ToUserName=''){
-
+    private function replyText($content,$ToUserName=''){
+        $xmlObject=$this->xmlObject;
         if($ToUserName==''){
 
-            $ToUserName=$obj->FromUserName;
+            $ToUserName=$xmlObject->FromUserName;
 
         }
 
@@ -554,7 +542,7 @@ class Wechat_base_api{
 
 
 
-        $resultStr = sprintf($replyXml,$ToUserName,$obj->ToUserName,time(),$content);
+        $resultStr = sprintf($replyXml,$ToUserName,$xmlObject->ToUserName,time(),$content);
 
             return $resultStr;      
 
