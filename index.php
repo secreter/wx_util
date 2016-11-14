@@ -4,16 +4,11 @@
 *实现类的自动加载
 */
 define("ROOT",dirname(__FILE__));
-set_include_path(".".PATH_SEPARATOR.ROOT."/public".PATH_SEPARATOR.get_include_path());
+set_include_path(".".PATH_SEPARATOR.ROOT."/wxfunction/".PATH_SEPARATOR.get_include_path());
 //__autoload();在实例化的对象没有找到类时会触发；实现动态加载
 function __autoload($classname)
 {
-    if(file_exists("$classname.php")){
-      require_once("$classname.php");
-    }
-    else{
-      echo 'class file'.$classname.'not found!';
-    }
+    require_once("$classname.php");
 }
 
 //include "mysql.php";
@@ -21,21 +16,54 @@ function __autoload($classname)
 //微信公众平台基础接口PHP SDK （面向过程版）
 
 define("TOKEN","weixin");
-$wechat = new Wechat_base_api("weixin");
+$wechat = new Wechat_base_api("weixin","wx129325db79888ee1","9e21fbec9c5fe8926a4f3ce0c4634529");
 
 
 class Wechat_base_api{
     private $token;
     private $xmlObject;
+    private $postData;
+    private $isDebug=false;
+    private $accessToken;
 
-    function __construct($token){
+    function __construct($token,$appId, $appSecret){
+        $jssdk=new JSSDK($appId, $appSecret);
         $this->token=$token;
-        if(!isset($_GET['echostr'])){
-            //调用响应消息函数
-            $this->responseMsg();
+        $this->accessToken=$jssdk->getAccessToken();
+        if ($this->localhostDebug()) {
+            
         }else{
-            //实现网址接入，调用验证消息函数   
-            $this->valid();
+            if(!isset($_GET['echostr'])){
+            //调用响应消息函数
+                $this->responseMsg();
+            }else{
+                //实现网址接入，调用验证消息函数   
+                $this->valid();
+            }
+        }
+        
+    }
+
+    private function localhostDebug(){
+        if ($_SERVER['HTTP_HOST'] != 'localhost') {
+            return false;
+        }else{
+            $this->isDebug=true;
+            echo "localhost visit!<br>";
+            $this->postData = "<xml>
+             <ToUserName><![CDATA[toUser]]></ToUserName>
+             <FromUserName><![CDATA[fromUser]]></FromUserName>
+             <CreateTime>1348831860</CreateTime>
+             <MsgType><![CDATA[text]]></MsgType>
+             <Content><![CDATA[this is a test]]></Content>
+             <MsgId>1234567890123456</MsgId>
+             </xml>";
+            $this->xmlObject = simplexml_load_string($this->postData,"SimpleXMLElement",LIBXML_NOCDATA);
+            $this->xmlObject->Content = $_GET['text'];
+            $this->responseMsg();
+            // echo $this->xmlObject->Content;
+            echo "accessToken:$this->accessToken";
+            return true;
         }
     }
 
@@ -97,22 +125,24 @@ class Wechat_base_api{
 
     //响应消息
     public function responseMsg(){
+        if (!$this->isDebug) {
+            //根据用户传过来的消息类型进行不同的响应
 
-        //根据用户传过来的消息类型进行不同的响应
+            //1、接收微信服务器POST过来的数据，XML数据包
 
-        //1、接收微信服务器POST过来的数据，XML数据包
+            $this->postData =  $GLOBALS[HTTP_RAW_POST_DATA];
 
-        $postData = $GLOBALS[HTTP_RAW_POST_DATA];
+            if(!$this->postData)
+            {
+                echo  "postData is empty!";
+                exit();
+            }
 
-        if(!$postData)
-        {
-            echo  "postData is empty!";
-            exit();
+            //2、解析XML数据包
+            $this->xmlObject = simplexml_load_string($this->postData,"SimpleXMLElement",LIBXML_NOCDATA);
         }
-
-        //2、解析XML数据包
-        $xmlObject = $this->xmlObject = simplexml_load_string($postData,"SimpleXMLElement",LIBXML_NOCDATA);
-
+        // var_dump()
+        $xmlObject = $this->xmlObject ;
         //获取消息类型
         $MsgType = $xmlObject->MsgType;
 
@@ -122,7 +152,7 @@ class Wechat_base_api{
 
                     //接收事件推送
 
-                    $this->receiveEvent($xmlObject);   
+                    $this->receiveEvent();   
 
                 break;  
 
@@ -130,6 +160,7 @@ class Wechat_base_api{
 
                     //接收文本消息
             if($xmlObject->Content=='debug'){
+                $postData=$this->postData;
                 $postData=str_replace('<', '《', $postData);
                 $postData=str_replace('>', '》', $postData);
                 foreach ($_GET as $key => $value) {
@@ -145,103 +176,71 @@ class Wechat_base_api{
                 exit;
             }
 
+            if ($xmlObject->Content=='模板') {
+                $content=$this->replyTemplate();
+                echo $this->replyText($content); 
+                // echo $this->replyText($xmlObject->Content); 
+                exit;
+            }
 
-            if($xmlObject->Content=='菜单'){
-
-                $content='*回复“菜单”，显示本操作菜单。
-
-                            *直接发消息，表示发出一条树洞状态，状态字符数必须大于7个字符并且小于140个字符。为防止水树洞，每条状态时间间隔为3分钟。
-
-                            *回复“回复[7]***”，***代表消息，表示回复编号为7的树洞消息，消息将回复到指定树洞状态下方，所有人可见。
-
-                            *回复“树洞”，查看最近5条树洞状态和回复。
-
-                            *回复“树洞[7]”，查看从7-12其中5条状态和回复。
-
-                            *回复“丢瓶子[***]”,***代表消息，表示丢出一个漂流瓶，漂流瓶字符数必须大于7个字符并且小于140个字符。
-
-                            *回复“回复瓶子[7]***”，***代表消息，表示回复编号为7的漂流瓶消息，消息将回复到指定漂流瓶下方，捞到瓶子的人可见。
-
-                            *回复“捞瓶子”，随机捞取一个漂流瓶。
-
-                            *回复“捞瓶子[7]”，捞取指定编号为7的漂流瓶。
-
-                            *回复“笑话”随机生成笑话。
-
-                            *回复“糗事”随机生成糗事。
-
-                            *回复“微小说”随机生成微小说。
-
-                            *回复“文章”随机生成one和redream文章           
-
-							*回复‘表白’进入表白墙；
-
-							*回复‘心情’进入心情簿；
-
-							*回复‘许愿’进入许愿墙；
-
-							*回复‘广场’进入南开广场；
-
-							';
-
-                         echo $this->replyText($content); 
-
-                         exit;
-
-                         }   
-
-                    echo $this->replyText($xmlObject->Content); 
-
-                        break;
+            $textEvent=new TextEvent($xmlObject);
+            $content=$textEvent->response();
+            if ($content!='') {
+                echo $this->replyText($content); 
+            }else{
+                echo '';
+            }
+            
+                break;
                     
 
             case 'image':
 
-                        //接收图片消息
+                //接收图片消息
 
-                        echo $this->receiveImage($xmlObject);  
+                echo $this->receiveImage();  
 
                 break;
 
             case 'location':
 
-                        //接收地理位置消息
+                //接收地理位置消息
 
-                        echo $this->receiveLocation($xmlObject);   
+                echo $this->receiveLocation();   
 
                 break;  
 
             case 'voice':
 
-                    //接收语音消息
+                //接收语音消息
 
-                    echo $this->receiveVoice($xmlObject);
+                echo $this->receiveVoice();
 
                 break; 
 
             case 'video':
 
-                    //接收视频消息
+                //接收视频消息
 
-                    echo $this->receiveVideo($xmlObject);
+                echo $this->receiveVideo();
 
                 break;
 
             case 'shortvideo':
 
-                    //接小收视频消息
+                //接小收视频消息
 
-                    echo $this->receiveVideo($xmlObject);
+                echo $this->receiveVideo();
 
                 break;
 
             case  'link':
 
-                    //接收链接消息
+                //接收链接消息
 
-                    echo $this->receiveLink($xmlObject);
+                echo $this->receiveLink();
 
-                    break;
+                break;
 
             default:
 
@@ -255,9 +254,9 @@ class Wechat_base_api{
 
     //接收事件推送
 
-    private function receiveEvent($obj){
+    private function receiveEvent(){
 
-        switch ($obj->Event) {
+        switch ($this->xmlObject->Event) {
 
             //关注事件
 
@@ -265,7 +264,7 @@ class Wechat_base_api{
 
                 //扫描带参数的二维码，用户未关注时，进行关注后的事件
 
-                if(!empty($obj->EventKey)){
+                if(!empty($this->xmlObject->EventKey)){
 
                     //做相关处理
 
@@ -337,9 +336,7 @@ class Wechat_base_api{
 
                 
 
-                echo $this->replyNews($obj,$dataArray);
-
-
+                echo $this->replyNews($dataArray);
 
                 break;
 
@@ -363,7 +360,7 @@ class Wechat_base_api{
 
                 //
 
-                switch ($obj->EventKey) {
+                switch ($this->xmlObject->EventKey) {
 
                     case 'FAQ':
 
@@ -392,15 +389,13 @@ class Wechat_base_api{
 
     }
 
-
-
     //接收文本消息
 
-    private function receiveText($obj){
+    private function receiveText(){
 
         //获取文本消息的内容
 
-        $content = $obj->Content;
+        $content = $this->xmlObject->Content;
 
         //发送文本消息
 
@@ -408,11 +403,9 @@ class Wechat_base_api{
 
     }
 
-
-
     //接收图片消息
 
-    private function receiveImage($obj)
+    private function receiveImage()
 
     {
 
@@ -420,23 +413,21 @@ class Wechat_base_api{
 
         $imageArr = array(
 
-            "PicUrl"=>$obj->PicUrl,
+            "PicUrl"=>$this->xmlObject->PicUrl,
 
-            "MediaId"=>$obj->MediaId
+            "MediaId"=>$this->xmlObject->MediaId
 
             );
 
         //发送图片消息
 
-        return $this->replyImage($obj,$imageArr);
+        return $this->replyImage($imageArr);
 
     }
 
-
-
     //接收地理位置消息
 
-    private function receiveLocation($obj)
+    private function receiveLocation()
 
     {
 
@@ -444,11 +435,11 @@ class Wechat_base_api{
 
         $locationArr = array(
 
-                "Location_X"=>$obj->Location_X,
+                "Location_X"=>$this->xmlObject->Location_X,
 
-                "Location_Y"=>"地址位置经度：".$obj->Location_Y,
+                "Location_Y"=>"地址位置经度：".$this->xmlObject->Location_Y,
 
-                "Label"=>$obj->Label
+                "Label"=>$this->xmlObject->Label
 
             );
 
@@ -458,53 +449,47 @@ class Wechat_base_api{
 
     }
 
-
-
     //接收语言消息
 
-    private function receiveVoice($obj){
+    private function receiveVoice(){
 
         //获取语言消息内容
 
         $voiceArr = array(
 
-                "MediaId"=>$obj->MediaId,
+                "MediaId"=>$this->xmlObject->MediaId,
 
-                "Format"=>$obj->Format
+                "Format"=>$this->xmlObject->Format
 
             );
 
         //回复语言消息
 
-        return $this->replyVoice($obj,$voiceArr);
+        return $this->replyVoice($voiceArr);
 
     }
 
-
-
     //接收视频消息
 
-    private function receiveVideo($obj){
+    private function receiveVideo(){
 
         //获取视频消息的内容
 
         $videoArr = array(
 
-                "MediaId"=>$obj->MediaId 
+                "MediaId"=>$this->xmlObject->MediaId 
 
             );
 
         //回复视频消息
 
-        return $this->replyVideo($obj,$videoArr);           
+        return $this->replyVideo($videoArr);           
 
     }
 
-
-
     //接收链接消息
 
-    private function receiveLink($obj)
+    private function receiveLink()
 
     {
 
@@ -512,11 +497,11 @@ class Wechat_base_api{
 
         $linkArr = array(
 
-                "Title"=>$obj->Title,
+                "Title"=>$this->xmlObject->Title,
 
-                "Description"=>$obj->Description,
+                "Description"=>$this->xmlObject->Description,
 
-                "Url"=>$obj->Url
+                "Url"=>$this->xmlObject->Url
 
             );
 
@@ -525,8 +510,6 @@ class Wechat_base_api{
         return $this->replyText("你发过来的链接地址是{$linkArr['Url']}");
 
     }
-
-
 
     //发送文本消息
 
@@ -554,19 +537,16 @@ class Wechat_base_api{
 
             //返回一个进行xml数据包
 
+        $resultStr = sprintf($replyXml,$xmlObject->FromUserName,$xmlObject->ToUserName,time(),$content);
 
-
-        $resultStr = sprintf($replyXml,$ToUserName,$xmlObject->ToUserName,time(),$content);
-
-            return $resultStr;      
+        return $resultStr;      
 
     }
 
-
-
     //发送图片消息
 
-    private function replyImage($obj,$imageArr){
+    private function replyImage($imageArr){
+        $xmlObject=$this->xmlObject;
 
         $replyXml = "<xml>
 
@@ -588,22 +568,18 @@ class Wechat_base_api{
 
             //返回一个进行xml数据包
 
+        $resultStr = sprintf($replyXml,$xmlObject->FromUserName,$xmlObject->ToUserName,time(),$imageArr['MediaId']);
 
-
-        $resultStr = sprintf($replyXml,$obj->FromUserName,$obj->ToUserName,time(),$imageArr['MediaId']);
-
-            return $resultStr;          
+        return $resultStr;          
 
     }
 
-
-
     //回复语音消息
 
-    private function replyVoice($obj,$voiceArr)
+    private function replyVoice($voiceArr)
 
     {
-
+        $xmlObject=$this->xmlObject;
         $replyXml = "<xml>
 
                     <ToUserName><![CDATA[%s]]></ToUserName>
@@ -626,9 +602,9 @@ class Wechat_base_api{
 
 
 
-        $resultStr = sprintf($replyXml,$obj->FromUserName,$obj->ToUserName,time(),$voiceArr['MediaId']);
+        $resultStr = sprintf($replyXml,$xmlObject->FromUserName,$xmlObject->ToUserName,time(),$voiceArr['MediaId']);
 
-            return $resultStr;      
+        return $resultStr;      
 
     }
 
@@ -636,8 +612,8 @@ class Wechat_base_api{
 
     //回复视频消息
 
-    private function replyVideo($obj,$videoArr){
-
+    private function replyVideo($videoArr){
+        $xmlObject=$this->xmlObject;
         $replyXml = "<xml>
 
                     <ToUserName><![CDATA[%s]]></ToUserName>
@@ -658,11 +634,9 @@ class Wechat_base_api{
 
             //返回一个进行xml数据包
 
+        $resultStr = sprintf($replyXml,$xmlObject->FromUserName,$xmlObject->ToUserName,time(),$videoArr['MediaId']);
 
-
-        $resultStr = sprintf($replyXml,$obj->FromUserName,$obj->ToUserName,time(),$videoArr['MediaId']);
-
-            return $resultStr;
+        return $resultStr;
 
     }
 
@@ -670,8 +644,8 @@ class Wechat_base_api{
 
     //回复链接消息
 
-    private function  replyLink($obj,$linkArr){
-
+    private function  replyLink($linkArr){
+        $xmlObject=$this->xmlObject;
         $replyXml = "<xml>
 
                     <ToUserName><![CDATA[%s]]></ToUserName>
@@ -692,11 +666,11 @@ class Wechat_base_api{
 
                     </xml>";
 
-                    //MsgId存在问题
+        //MsgId存在问题
 
-                    $resultStr = sprintf($replyXml,$obj->FromUserName,$obj->ToUserName,time(),$linkArr['Title'],$linkArr['Description'],$linkArr['Url']);
+        $resultStr = sprintf($replyXml,$xmlObject->FromUserName,$xmlObject->ToUserName,time(),$linkArr['Title'],$linkArr['Description'],$linkArr['Url']);
 
-            return $resultStr;
+        return $resultStr;
 
     }
 
@@ -704,10 +678,10 @@ class Wechat_base_api{
 
     //回复音乐消息
 
-    private function  replyMusic($obj,$musicArr)
+    private function  replyMusic($musicArr)
 
     {
-
+        $xmlObject=$this->xmlObject;
         $replyXml = "<xml>
 
                     <ToUserName><![CDATA[%s]]></ToUserName>
@@ -738,9 +712,9 @@ class Wechat_base_api{
 
 
 
-        $resultStr = sprintf($replyXml,$obj->FromUserName,$obj->ToUserName,time(),$musicArr['Title'],$musicArr['Description'],$musicArr['MusicUrl'],$musicArr['HQMusicUrl'],$musicArr['ThumbMediaId']);
+        $resultStr = sprintf($replyXml,$xmlObject->FromUserName,$xmlObject->ToUserName,time(),$musicArr['Title'],$musicArr['Description'],$musicArr['MusicUrl'],$musicArr['HQMusicUrl'],$musicArr['ThumbMediaId']);
 
-            return $resultStr;      
+        return $resultStr;      
 
     }
 
@@ -748,8 +722,8 @@ class Wechat_base_api{
 
     //回复图文消息
 
-    private function replyNews($obj,$newsArr){
-
+    private function replyNews($newsArr){
+        $xmlObject=$this->xmlObject;
         $itemStr = "";
 
         if(is_array($newsArr))
@@ -776,11 +750,7 @@ class Wechat_base_api{
 
             }
 
-
-
         }
-
-
 
         $replyXml = "<xml>
 
@@ -804,12 +774,113 @@ class Wechat_base_api{
 
             //返回一个进行xml数据包
 
+        $resultStr = sprintf($replyXml,$xmlObject->FromUserName,$xmlObject->ToUserName,time(),count($newsArr));
 
+        return $resultStr;          
 
-        $resultStr = sprintf($replyXml,$obj->FromUserName,$obj->ToUserName,time(),count($newsArr));
+    }
 
-            return $resultStr;          
+    /*
+    {
+       "touser":"OPENID",
+       "template_id":"ngqIpbwh8bUfcSsECmogfXcV14J0tQlEpBO27izEYtY",
+       "url":"http://weixin.qq.com/download",            
+       "data":{
+           "first": {
+               "value":"恭喜你购买成功！",
+               "color":"#173177"
+           },
+           "keyword1":{
+               "value":"巧克力",
+               "color":"#173177"
+           },
+           "keyword2": {
+               "value":"39.8元",
+               "color":"#173177"
+           },
+           "keyword3": {
+               "value":"2014年9月22日",
+               "color":"#173177"
+           },
+           "remark":{
+               "value":"欢迎再次购买！",
+               "color":"#173177"
+           }
+       }
+    }
+    */
+    private function replyTemplate(){
+        $templateJson='{
+           "touser":"",
+           "template_id":"",
+           "url":"",            
+           "data":{
+               "first": {
+                   "value":"",
+                   "color":""
+               },
+               "keyword1":{
+                   "value":"",
+                   "color":""
+               },
+               "keyword2": {
+                   "value":"",
+                   "color":""
+               },
+               "keyword3": {
+                   "value":"",
+                   "color":""
+               },
+               "remark":{
+                   "value":"",
+                   "color":""
+               }
+           }
+        }';
+        $xmlObject=$this->xmlObject;
+        $template=json_decode($templateJson,true);
+        //这里不”“。转换成字符串不识别，难道转换过来的类型不是字符串？
+        $template["touser"]="".$this->xmlObject->FromUserName;
+        // $template["touser"]="on0bXjiMkvuZgFA320MSMC_JWetw";
+        $template["template_id"]="sJx0OByifymwSKSz-h6dNrb6QqDaEMPqz40QtXGRQek";
+        $template["url"]="http://redream.cn";
+        $template["data"]["first"]["value"]="欢迎来到南开一梦";
+        $template["data"]["first"]["color"]="#798000";
+        $template["data"]["keyword1"]["value"]="So的一封信";
+        $template["data"]["keyword1"]["color"]="#798000";
+        // $template["data"]["keyword2"]["value"]="等你审批";
+        $template["data"]["keyword2"]["value"]="--".$xmlObject->FromUserName;
+        $template["data"]["keyword2"]["color"]="#798000";
+        $template["data"]["keyword3"]["value"]="2016年11月14日";
+        $template["data"]["keyword3"]["color"]="#798000";
+        $template["data"]["remark"]["value"]="期待你~";
+        $template["data"]["remark"]["color"]="#798000";
 
+        $templateJson=json_encode($template);
+        $url="https://api.weixin.qq.com/cgi-bin/message/template/send?access_token=".$this->accessToken;
+        return $this->httpPost($url,$templateJson);
+
+    }
+
+    private function httpPost($url,$data){
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        //微信官方设置是不对的
+        curl_setopt($ch, 2, true);
+
+        // post数据
+        curl_setopt($ch, CURLOPT_POST, 1);
+        // post的变量
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+
+        $res = curl_exec($ch);
+        curl_close($ch);
+        // print_r($data);
+        // var_dump($res);
+        return $res;
     }
 
 }
